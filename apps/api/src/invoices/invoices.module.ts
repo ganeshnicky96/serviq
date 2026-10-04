@@ -11,5 +11,6 @@ import { AuthModule } from '../auth/auth.module.js';
     InvoicesService,
     InvoicePdfService,
   ],
+  exports: [InvoicesService],
 })
 export class InvoicesModule {}

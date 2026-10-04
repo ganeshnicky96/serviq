@@ -7,5 +7,6 @@ import { TrackingService } from './tracking.service.js';
   imports: [AuthModule],
   controllers: [TrackingController],
   providers: [TrackingService],
+  exports: [TrackingService],
 })
 export class TrackingModule {}
