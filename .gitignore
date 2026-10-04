@@ -20,3 +20,18 @@ ios/Pods/
 .vscode/*
 !.vscode/extensions.json
 !.vscode/settings.json
+# Local AI/editor tooling
+apps/api/.agents/
+apps/api/.claude/
+apps/api/.cursor/
+apps/api/.devin/
+
+# Generated local artifacts
+*.tsbuildinfo
+apps/api/*.pdf
+
+# Local backup files
+apps/api/prisma.config.backup.ts
+apps/api/src/prisma/*backup*.prisma
+
+apps/api/src/prisma/contract.prisma.starter-backup

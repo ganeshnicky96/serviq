@@ -1,0 +1,745 @@
+// use prisma-next
+
+// ============================================================
+// SERVIQ - MODULE 1
+// IDENTITY & ORGANIZATION
+// ============================================================
+
+
+// ============================================================
+// ENUMS
+// ============================================================
+
+enum UserRole {
+  @@type("pg/text@1")
+
+  CUSTOMER
+  PARTNER
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum UserStatus {
+  @@type("pg/text@1")
+
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+  PENDING
+}
+
+enum PartnerStatus {
+  @@type("pg/text@1")
+
+  PENDING_VERIFICATION
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum PricingType {
+  @@type("pg/text@1")
+
+  FIXED
+  STARTING_FROM
+  PER_UNIT
+  INSPECTION_REQUIRED
+}
+
+enum BookingStatus {
+  @@type("pg/text@1")
+
+  PENDING
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum JobStatus {
+  @@type("pg/text@1")
+
+  UNASSIGNED
+  OFFERED
+  ACCEPTED
+  EN_ROUTE
+  ARRIVED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum JobOfferStatus {
+  @@type("pg/text@1")
+
+  OFFERED
+  ACCEPTED
+  REJECTED
+  EXPIRED
+  CANCELLED
+}
+
+enum NotificationEventType {
+  OTP_REQUESTED
+  BOOKING_CREATED
+  PARTNER_ASSIGNED
+  JOB_ACCEPTED
+  PARTNER_EN_ROUTE
+  PARTNER_ARRIVED
+  JOB_STARTED
+  JOB_COMPLETED
+  BOOKING_CANCELLED
+  PAYMENT_SUCCESSFUL
+  INVOICE_GENERATED
+
+  @@type("pg/text@1")
+}
+
+enum NotificationChannel {
+  IN_APP
+  PUSH
+  SMS
+  WHATSAPP
+  EMAIL
+
+  @@type("pg/text@1")
+}
+
+enum NotificationDeliveryStatus {
+  PENDING
+  SENT
+  DELIVERED
+  FAILED
+
+  @@type("pg/text@1")
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  SUCCESS
+  FAILED
+  REFUNDED
+  PARTIALLY_REFUNDED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  ONLINE
+  CASH
+  UPI
+  CARD
+  NET_BANKING
+  WALLET
+}
+
+enum TransactionType {
+  PAYMENT
+  REFUND
+}
+
+enum TransactionStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+enum InvoiceStatus {
+  DRAFT
+  ISSUED
+  PAID
+  CANCELLED
+  REFUNDED
+  @@type("pg/text@1")
+}
+
+// ============================================================
+// NOTIFICATION
+// ============================================================
+
+model Notification {
+  id          Uuid     @id @default(uuid())
+  userId      Uuid
+  eventType   NotificationEventType
+  title       String
+  message     String
+  bookingId   Uuid?
+  jobId       Uuid?
+  isRead      Boolean  @default(false)
+  readAt      DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   temporal.updatedAt()
+
+  user        User      @relation(fields: [userId], references: [id])
+  booking     Booking?  @relation(fields: [bookingId], references: [id])
+  job         Job?      @relation(fields: [jobId], references: [id])
+
+  @@index([userId])
+  @@index([eventType])
+  @@index([bookingId])
+  @@index([jobId])
+  @@index([isRead])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+
+model NotificationDelivery {
+  id             Uuid                     @id @default(uuid())
+  notificationId Uuid
+  channel        NotificationChannel
+  status         NotificationDeliveryStatus @default(PENDING)
+  attempts       Int                      @default(0)
+  providerRef    String?
+  failureReason  String?
+  sentAt         DateTime?
+  deliveredAt    DateTime?
+  createdAt      DateTime                 @default(now())
+  updatedAt      temporal.updatedAt()
+
+  notification   Notification             @relation(fields: [notificationId], references: [id])
+
+  @@index([notificationId])
+  @@index([channel])
+  @@index([status])
+  @@index([createdAt])
+  @@map("notification_deliveries")
+}
+
+// ============================================================
+// ORGANIZATION
+// ============================================================
+
+model Organization {
+  id         Uuid     @id @default(uuid())
+  name       String
+  slug       String   @unique
+  phone      String?
+  email      String?
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  temporal.updatedAt()
+
+  users      User[]
+  customers  CustomerProfile[]
+  partners   PartnerProfile[]
+  categories  ServiceCategory[]
+  services    Service[]
+  @@map("organizations")
+}
+
+
+// ============================================================
+// USER
+// ============================================================
+
+model User {
+  id               Uuid       @id @default(uuid())
+  organizationId   Uuid?
+  phone            String     @unique
+  email            String?    @unique
+  firstName        String?
+  lastName         String?
+  role             UserRole
+  status           UserStatus @default(PENDING)
+  isPhoneVerified  Boolean    @default(false)
+  isEmailVerified  Boolean    @default(false)
+  lastLoginAt      DateTime?
+  createdAt        DateTime   @default(now())
+  updatedAt        temporal.updatedAt()
+  notifications    Notification[]
+
+  organization     Organization?
+    @relation(fields: [organizationId], references: [id])
+
+  customer         CustomerProfile?
+  partner          PartnerProfile?
+
+  @@index([organizationId])
+  @@index([phone])
+  @@map("users")
+}
+
+
+// ============================================================
+// CUSTOMER PROFILE
+// ============================================================
+
+model CustomerProfile {
+  id              Uuid      @id @default(uuid())
+  userId          Uuid      @unique
+  organizationId  Uuid?
+  dateOfBirth     DateTime?
+  profileImage    String?
+  createdAt       DateTime  @default(now())
+  updatedAt       temporal.updatedAt()
+
+  user            User
+    @relation(fields: [userId], references: [id])
+
+  organization    Organization?
+    @relation(fields: [organizationId], references: [id])
+
+  addresses       Address[]
+  bookings        Booking[]
+  payments        Payment[]
+
+  @@index([organizationId])
+  @@map("customer_profiles")
+}
+
+
+// ============================================================
+// CUSTOMER ADDRESS
+// ============================================================
+
+model Address {
+  id            Uuid      @id @default(uuid())
+  customerId    Uuid
+  label         String
+  addressLine1  String
+  addressLine2  String?
+  landmark      String?
+  city          String
+  state         String
+  postalCode    String
+  latitude      Decimal?
+  longitude     Decimal?
+  isDefault     Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+  updatedAt     temporal.updatedAt()
+
+  customer      CustomerProfile
+    @relation(fields: [customerId], references: [id])
+
+  bookings      Booking[]
+
+  @@index([customerId])
+  @@map("addresses")
+}
+
+
+// ============================================================
+// PARTNER PROFILE
+// ============================================================
+
+model PartnerProfile {
+  id                 Uuid          @id @default(uuid())
+  userId             Uuid          @unique
+  organizationId     Uuid?
+  partnerCode        String        @unique
+  status             PartnerStatus @default(PENDING_VERIFICATION)
+  profileImage       String?
+  bio                String?
+  yearsOfExperience  Int?
+  rating             Decimal      
+  totalJobsCompleted Int           @default(0)
+  isVerified         Boolean       @default(false)
+  createdAt          DateTime      @default(now())
+  updatedAt          temporal.updatedAt()
+
+  user               User
+    @relation(fields: [userId], references: [id])
+
+  organization       Organization?
+    @relation(fields: [organizationId], references: [id])
+
+  skills             PartnerSkill[]
+  jobs               Job[]
+  availability       PartnerAvailability?
+  jobOffers           JobOffer[]
+  locations          PartnerLocation[]
+
+  @@index([organizationId])
+  @@index([status])
+  @@map("partner_profiles")
+}
+
+// ============================================================
+// PARTNER AVAILABILITY
+// ============================================================
+
+model PartnerAvailability {
+  id         Uuid     @id @default(uuid())
+  partnerId  Uuid     @unique
+  isOnline   Boolean  @default(false)
+  isBusy     Boolean  @default(false)
+  latitude   Decimal?
+  longitude  Decimal?
+  lastSeenAt DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  temporal.updatedAt()
+
+  partner    PartnerProfile
+    @relation(fields: [partnerId], references: [id])
+
+  @@index([isOnline])
+  @@index([isBusy])
+  @@map("partner_availability")
+}
+
+// ============================================================
+// PARTNER LOCATION
+// ============================================================
+
+model PartnerLocation {
+  id         Uuid      @id @default(uuid())
+  partnerId  Uuid
+  jobId      Uuid?
+  latitude   Decimal
+  longitude  Decimal
+  accuracy   Decimal?
+  heading    Decimal?
+  speed      Decimal?
+  recordedAt DateTime  @default(now())
+  createdAt  DateTime  @default(now())
+
+  partner    PartnerProfile
+    @relation(fields: [partnerId], references: [id])
+
+  job        Job?
+    @relation(fields: [jobId], references: [id])
+
+  @@index([partnerId])
+  @@index([jobId])
+  @@index([recordedAt])
+  @@map("partner_locations")
+}
+
+// ============================================================
+// SERVICE CATEGORY
+// ============================================================
+
+model ServiceCategory {
+  id              Uuid      @id @default(uuid())
+  organizationId  Uuid?
+  name            String
+  slug            String
+  description     String?
+  icon            String?
+  isActive        Boolean   @default(true)
+  sortOrder       Int       @default(0)
+  createdAt       DateTime  @default(now())
+  updatedAt       temporal.updatedAt()
+
+  organization    Organization?
+    @relation(fields: [organizationId], references: [id])
+
+  services        Service[]
+
+  @@unique([organizationId, slug])
+  @@index([organizationId])
+  @@map("service_categories")
+}
+
+// ============================================================
+// SERVICE
+// ============================================================
+
+model Service {
+  id                  Uuid       @id @default(uuid())
+  organizationId      Uuid?
+  categoryId          Uuid
+  name                String
+  slug                String
+  description         String?
+  pricingType         PricingType
+  price               Decimal
+  currency            String     @default("INR")
+  unitLabel           String?
+  estimatedTimeMinutes Int?
+  taxIncluded         Boolean    @default(true)
+  isActive             Boolean    @default(true)
+  sortOrder            Int       @default(0)
+  createdAt            DateTime  @default(now())
+  updatedAt            temporal.updatedAt()
+
+  organization        Organization?
+    @relation(fields: [organizationId], references: [id])
+
+  category            ServiceCategory
+    @relation(fields: [categoryId], references: [id])
+
+  partnerSkills       PartnerSkill[]
+  bookings            Booking[]
+
+  @@unique([organizationId, slug])
+  @@index([organizationId])
+  @@index([categoryId])
+  @@index([isActive])
+  @@map("services")
+}
+
+// ============================================================
+// PARTNER SKILL
+// ============================================================
+
+model PartnerSkill {
+  id          Uuid      @id @default(uuid())
+  partnerId   Uuid
+  serviceId   Uuid
+  isPrimary   Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+
+  partner     PartnerProfile
+    @relation(fields: [partnerId], references: [id])
+
+  service     Service
+    @relation(fields: [serviceId], references: [id])
+
+  @@unique([partnerId, serviceId])
+  @@index([partnerId])
+  @@index([serviceId])
+  @@map("partner_skills")
+}
+
+// ============================================================
+// BOOKING
+// ============================================================
+
+model Booking {
+  id                  Uuid          @id @default(uuid())
+  bookingCode         String        @unique
+
+  customerId          Uuid
+  serviceId           Uuid
+  addressId           Uuid
+
+  status              BookingStatus @default(PENDING)
+
+  scheduledAt         DateTime?
+
+  customerNotes       String?
+
+  pricingType         PricingType
+  unitPrice           Decimal
+  quantity            Decimal?
+  estimatedSubtotal   Decimal?
+  estimatedTax        Decimal?
+  estimatedTotal      Decimal?
+  currency            String        @default("INR")
+  taxIncluded         Boolean       @default(true)
+
+  createdAt            DateTime      @default(now())
+  updatedAt            temporal.updatedAt()
+  notifications       Notification[]
+  payments            Payment[]
+  customer             CustomerProfile
+    @relation(fields: [customerId], references: [id])
+
+  service              Service
+    @relation(fields: [serviceId], references: [id])
+
+  address              Address
+    @relation(fields: [addressId], references: [id])
+
+  job                  Job?
+
+  @@index([customerId])
+  @@index([serviceId])
+  @@index([addressId])
+  @@index([status])
+  @@index([scheduledAt])
+  @@map("bookings")
+}
+
+// ============================================================
+// JOB
+// ============================================================
+
+model Job {
+  id                  Uuid       @id @default(uuid())
+
+  bookingId           Uuid       @unique
+  partnerId           Uuid?
+
+  status              JobStatus  @default(UNASSIGNED)
+
+  assignedAt          DateTime?
+  acceptedAt          DateTime?
+  startedAt           DateTime?
+  completedAt         DateTime?
+  cancelledAt         DateTime?
+
+  completionNotes     String?
+  cancellationReason String?
+
+  createdAt           DateTime   @default(now())
+  updatedAt           temporal.updatedAt()
+  notifications       Notification[]
+  
+
+  booking             Booking
+    @relation(fields: [bookingId], references: [id])
+
+  partner             PartnerProfile?
+    @relation(fields: [partnerId], references: [id])
+  offers              JobOffer[]
+  locations           PartnerLocation[]
+  
+  @@index([partnerId])
+  @@index([status])
+  @@index([assignedAt])
+  @@map("jobs")
+}
+
+// ============================================================
+// JOB OFFER
+// ============================================================
+model JobOffer {
+  id          Uuid           @id @default(uuid())
+  jobId       Uuid
+  partnerId   Uuid
+  status      JobOfferStatus @default(OFFERED)
+  offeredAt   DateTime       @default(now())
+  respondedAt DateTime?
+  expiresAt   DateTime?
+  createdAt   DateTime       @default(now())
+  updatedAt   temporal.updatedAt()
+
+  job         Job
+    @relation(fields: [jobId], references: [id])
+
+  partner     PartnerProfile
+    @relation(fields: [partnerId], references: [id])
+
+  @@index([jobId])
+  @@index([partnerId])
+  @@index([status])
+  @@index([expiresAt])
+  @@unique([jobId, partnerId])
+  @@map("job_offers")
+}
+
+// ============================================================
+// PYAMENTS
+// ============================================================
+
+model Payment {
+  id                  Uuid          @id @default(uuid())
+  bookingId           Uuid
+  customerId          Uuid
+
+  amount              Decimal
+  currency            String        @default("INR")
+
+  status              PaymentStatus @default(PENDING)
+  method              PaymentMethod
+
+  gateway             String?
+  gatewayOrderId      String?
+  gatewayPaymentId    String?
+  gatewaySignature    String?
+
+  paidAt              DateTime?
+
+  failureReason       String?
+
+  createdAt           DateTime      @default(now())
+  updatedAt           temporal.updatedAt()
+
+  booking             Booking
+     @relation( fields: [bookingId], references: [id])
+
+  customer            CustomerProfile
+    @relation(fields: [customerId], references: [id])
+
+  transactions        PaymentTransaction[]
+
+  @@index([bookingId])
+  @@index([customerId])
+  @@index([status])
+  @@index([gatewayOrderId])
+  @@index([gatewayPaymentId])
+  @@map("payments")
+}
+
+// ============================================================
+// PAYMENT TRANSACTION
+// ============================================================
+
+model PaymentTransaction {
+  id                  Uuid              @id @default(uuid())
+  paymentId           Uuid
+
+  type                TransactionType
+  status              TransactionStatus
+
+  amount              Decimal
+  currency            String            @default("INR")
+
+  gateway             String?
+  gatewayReference    String?
+
+  failureReason       String?
+
+  processedAt         DateTime?
+
+  createdAt           DateTime          @default(now())
+  updatedAt           temporal.updatedAt()
+
+  payment             Payment
+    @relation(fields: [paymentId], references: [id])
+
+  @@index([paymentId])
+  @@index([status])
+  @@index([gatewayReference])
+  @@map("payment_transactions")
+}
+
+// ============================================================
+// INVOICE
+// ============================================================
+
+
+model Invoice {
+  id                Uuid          @id @default(uuid())
+  bookingId         Uuid
+  customerId        Uuid?
+  invoiceNumber     String        @unique
+  status            InvoiceStatus @default(DRAFT)
+
+  subtotal          Decimal
+  tax               Decimal?
+  total             Decimal
+  currency          String        @default("INR")
+
+  paymentMethod     PaymentMethod?
+  paymentReference  String?
+  issuedAt          DateTime?
+  paidAt            DateTime?
+  cancelledAt       DateTime?
+  refundedAt        DateTime?
+
+  createdAt         DateTime      @default(now())
+  updatedAt         temporal.updatedAt()
+
+  booking           Booking       @relation(fields: [bookingId], references: [id])
+  customer          CustomerProfile? @relation(fields: [customerId], references: [id])
+
+  @@index([bookingId])
+  @@index([customerId])
+  @@index([status])
+  @@index([invoiceNumber])
+  @@index([createdAt])
+  @@map("invoices")
+}
+
+// ============================================================
+// MOBILE OTP VERIFICATION
+// ============================================================
+
+model OtpVerification {
+  id            Uuid      @id @default(uuid())
+  phone         String
+  codeHash      String
+  expiresAt     DateTime
+  attempts      Int       @default(0)
+  verifiedAt    DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     temporal.updatedAt()
+
+  @@index([phone])
+  @@index([expiresAt])
+  @@map("otp_verifications")
+}
