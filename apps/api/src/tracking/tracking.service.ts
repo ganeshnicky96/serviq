@@ -223,6 +223,7 @@ async getJobDistance(jobId: string) {
   };
 }
 
+
 async updateJobStatus(
   jobId: string,
   partnerId: string,
@@ -276,13 +277,26 @@ async updateJobStatus(
     update.completedAt = now;
   }
 
-  const updatedJob = await db.orm.public.Job
-  .where({ id: jobId })
-  .update(update);
+  const updatedJob = await db.transaction(async (tx) => {
+    const result = await tx.orm.public.Job
+      .where({ id: jobId })
+      .update(update);
 
-  if (!updatedJob) {
-    throw new NotFoundException('Job update failed');
-  }
+    if (!result) {
+      throw new NotFoundException('Job update failed');
+    }
+
+    if (status === 'COMPLETED') {
+      await tx.orm.public.PartnerAvailability
+        .where({ partnerId })
+        .update({
+          isBusy: false,
+          updatedAt: now,
+        });
+    }
+
+    return result;
+  });
 
   return {
     jobId,
@@ -292,6 +306,7 @@ async updateJobStatus(
     updatedAt: updatedJob.updatedAt,
   };
 }
+
 
 async getPartnerByUserId(userId: string) {
   const partner = await db.orm.public.PartnerProfile

@@ -483,6 +483,7 @@ async getJobDispatchState(jobId: string) {
   };
 }
 
+
 async setPartnerAvailability(
   partnerId: string,
   isOnline: boolean,
@@ -516,6 +517,7 @@ async setPartnerAvailability(
       lastSeenAt: Temporal.Now.instant(),
     });
 }
+
 
 @Cron(CronExpression.EVERY_MINUTE)
 async expirePendingOffers() {

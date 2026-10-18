@@ -1,3 +1,4 @@
+
 import { Module } from '@nestjs/common';
 import { DispatchController } from './dispatch.controller.js';
 import { DispatchService } from './dispatch.service.js';
@@ -17,5 +18,6 @@ import { NotificationsModule } from '../notifications/notifications.module.js';
     JwtAuthGuard,
     RolesGuard,
   ],
+  exports: [DispatchService],
 })
 export class DispatchModule {}

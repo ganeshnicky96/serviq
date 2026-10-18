@@ -10,6 +10,8 @@ import { AuthModule } from './auth/auth.module.js';
 import { NotificationsModule } from './notifications/notifications.module.js';
 import { PaymentsModule } from './payments/payments.module.js';
 import { InvoicesModule } from './invoices/invoices.module.js';
+import { CustomerModule } from './customer/customer.module.js';
+import { PartnerModule } from './partner/partner.module.js';
 
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
@@ -30,6 +32,8 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
      NotificationsModule,
      PaymentsModule,
      InvoicesModule,
+     CustomerModule,
+     PartnerModule,
   ],
   controllers: [AppController],
   providers: [AppService],
